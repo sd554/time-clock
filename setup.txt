@@ -1,0 +1,6 @@
+Setup:
+
+Install python
+Google Sheets API at https://console.developers.google.com
+In command line, pip install pygame, gspread, oauth2client, smtplib, httplib2, urllib2
+If using windows, download ptts at https://sourceforge.net/projects/jampal/files/
