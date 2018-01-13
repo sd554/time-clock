@@ -24,7 +24,7 @@ setWindowTitle("Time Clock")
 
 # button class
 class Button:
-    def __init__(self,x,y,w,h,color,text,where,action,rounded=True,cap=1000):
+    def __init__(self,x,y,w,h,color,text,where,action,rounded=False,cap=1000):
         # x-position, in percentage of screen-width
         self.x=x
         # y-position, in percentage of screen-height
@@ -147,7 +147,7 @@ def obtainData(logList):
                 elif val=="" and logList[1]=="out":
                     return False
         else:
-            print "Attempt to login with ID " + str(logList[2]) + " failed."
+            print "Attempt to log"+logList[1]+" with ID " + str(logList[2]) + " failed."
             return False
     except:
         checkConnection()
@@ -206,7 +206,7 @@ def checkDates():
             # if the first row on the spreadsheet contains a different date than todays date
             if not w.sheet2.cell(2,w.dateInCol).value==time.strftime("%x"):
                 # the following code deletes all rows on spreadsheet and emails members
-                while not w.sheet2.cell(2,w.dateInCol).value=="":
+                while not w.sheet2.cell(2,w.dateInCol).value==time.strftime("%x"):
                     # first three lines are for logging in to 1540photo@gmail.com
                     server = smtplib.SMTP("smtp.gmail.com",587)
                     server.starttls()
@@ -220,7 +220,6 @@ def checkDates():
                     return True
         except:
             checkConnection()
-            
 
 # the following uploads data to a history spreadsheet that shows the history of any member
 def history(log):
@@ -314,7 +313,7 @@ def logout(log):
                 # removes member from the lab attendance spreadsheet
                 w.sheet2.delete_row(nameRow)
         except:
-            checkConnection()        
+            checkConnection()
 
 ################################################################
 ###################  Connection Functions  #####################
@@ -378,7 +377,7 @@ def connect():
                     else:
                         w.emailCol2 = count
                 count+=1
-    
+
         # appends all IDs in order to w.ids
         seen=False
         for i in w.sheet.col_values(w.idCol):
@@ -387,7 +386,7 @@ def connect():
             elif not i=="":
                 w.ids.append(i)
             elif seen==True:
-                break        
+                break
     except httplib2.ServerNotFoundError:
         w.connection = False
 
@@ -442,44 +441,50 @@ def OK(b):
     w=getWorld()
     checkConnection() # checks wifi
     if w.connection:
-        if w.id in w.ids:
+        try:
+            if w.id in w.ids:
+                t = time.strftime("%H:%M:%S") # the time in hours:minutes:seconds
+                d = time.strftime("%x") # the date
+                idRow = w.ids.index(w.id)+w.labelRow+1 # row on hours/certs spreadsheet with the person
+                name = w.sheet.cell(idRow,w.nameCol).value
+                email = w.sheet.cell(idRow,w.emailCol).value
+                # os.system("say 'string' -vSamantha") speaks 'string' using Siri's voice
+                for val in w.sheet2.col_values(w.nameCol2):
+                    # You Are Clocked In and Are Logging In
+                    if val==name and w.io=="in":
+                        say("You are already clocked in!")
+                        break
+                    # You Are Clocked In and Are Logging Out
+                    elif val==name and w.io=="out":
+                      # say("Goodbye "+name.split(" ")[0])
+                        createFile([w.io,w.id,t,d,name,str(idRow),email])
+                        reset()
+                        break
+                    # You Are Clocked Out and Are Logging In
+                    elif val=="" and w.io=="in":
+                       # say("Welcome "+name.split(" ")[0])
+                        createFile([w.io,w.id,t,d,name,str(idRow),email])
+                        reset()
+                        break
+                    # You Are Clocked Out and Are Logging Out
+                    elif val=="" and w.io=="out":
+                        say("You never signed in!")
+                        break
+        except:
             t = time.strftime("%H:%M:%S") # the time in hours:minutes:seconds
             d = time.strftime("%x") # the date
-            idRow = w.ids.index(w.id)+w.labelRow+1 # row on hours/certs spreadsheet with the person
-            name = w.sheet.cell(idRow,w.nameCol).value
-            email = w.sheet.cell(idRow,w.emailCol).value
-            # os.system("say 'string' -vSamantha") speaks 'string' using Siri's voice
-            for val in w.sheet2.col_values(w.nameCol2):
-                # You Are Clocked In and Are Logging In
-                if val==name and w.io=="in":
-                    say("You are already clocked in!")
-                    break
-                # You Are Clocked In and Are Logging Out
-                elif val==name and w.io=="out":
-                    say("Goodbye "+name.split(" ")[0])
-                    createFile([w.io,w.id,t,d,name,str(idRow),email])
-                    reset()
-                    break
-                # You Are Clocked Out and Are Logging In
-                elif val=="" and w.io=="in":
-                    say("Welcome "+name.split(" ")[0])
-                    createFile([w.io,w.id,t,d,name,str(idRow),email])
-                    reset()
-                    break
-                # You Are Clocked Out and Are Logging Out
-                elif val=="" and w.io=="out":
-                    say("You never signed in!")
-                    break
+            createFile(["incomplete",w.io,w.id,t,d])
+            reset()
         else:
             # if the ID is invalid, as it doesn't exist
             say(str(w.id)+"is not a valid ID!")
             print w.id+" is not a valid ID."
     else:
         t = time.strftime("%H:%M:%S") # the time in hours:minutes:seconds
-        d = time.strftime("%x") # the date        
+        d = time.strftime("%x") # the date
         createFile(["incomplete",w.io,w.id,t,d])
         reset()
-        
+
 ################################################################
 ################################################################
 ################################################################
@@ -500,7 +505,7 @@ def start(w):
     w.logs = []
     # whether or not checkLogs() is running
     w.running = False
-    
+
     w.connection = False
     w.sheet = None # The Hours and Certifications Spreadsheet
     w.sheet2 = None # The Current Lab Attendance Spreadsheet
@@ -509,21 +514,21 @@ def start(w):
     w.buttons = [
     Button(0.07,0.3,0.4,0.4,(3,155,229),"Log In","home",IN,cap=50),
     Button(0.53,0.3,0.4,0.4,(255,171,64),"Log Out","home",OUT,cap=50),
-    Button(0.24,0.19,0.15,0.15,(208,211,216),"1","login/logout",KEY),
-    Button(0.42,0.19,0.15,0.15,(208,211,216),"2","login/logout",KEY),
-    Button(0.60,0.19,0.15,0.15,(208,211,216),"3","login/logout",KEY),
-    Button(0.24,0.39,0.15,0.15,(208,211,216),"4","login/logout",KEY),
-    Button(0.42,0.39,0.15,0.15,(208,211,216),"5","login/logout",KEY),
-    Button(0.60,0.39,0.15,0.15,(208,211,216),"6","login/logout",KEY),
-    Button(0.24,0.59,0.15,0.15,(208,211,216),"7","login/logout",KEY),
-    Button(0.42,0.59,0.15,0.15,(208,211,216),"8","login/logout",KEY),
-    Button(0.60,0.59,0.15,0.15,(208,211,216),"9","login/logout",KEY),
-    Button(0.24,0.79,0.15,0.15,(98,178,85),"OK","login/logout",OK),
-    Button(0.42,0.79,0.15,0.15,(208,211,216),"0","login/logout",KEY),
-    Button(0.60,0.79,0.15,0.15,(237,99,92),"Del","login/logout",DELETE),
-    Button(0.8,0.05,0.15,0.15,(3,155,229),"Cancel","login/logout",PASS)
+    Button(0.24,0.19,0.15,0.15,(208,211,216),"1","login/logout",KEY,cap=50),
+    Button(0.42,0.19,0.15,0.15,(208,211,216),"2","login/logout",KEY,cap=50),
+    Button(0.60,0.19,0.15,0.15,(208,211,216),"3","login/logout",KEY,cap=50),
+    Button(0.24,0.39,0.15,0.15,(208,211,216),"4","login/logout",KEY,cap=50),
+    Button(0.42,0.39,0.15,0.15,(208,211,216),"5","login/logout",KEY,cap=50),
+    Button(0.60,0.39,0.15,0.15,(208,211,216),"6","login/logout",KEY,cap=50),
+    Button(0.24,0.59,0.15,0.15,(208,211,216),"7","login/logout",KEY,cap=50),
+    Button(0.42,0.59,0.15,0.15,(208,211,216),"8","login/logout",KEY,cap=50),
+    Button(0.60,0.59,0.15,0.15,(208,211,216),"9","login/logout",KEY,cap=50),
+    Button(0.24,0.79,0.15,0.15,(98,178,85),"OK","login/logout",OK,cap=50),
+    Button(0.42,0.79,0.15,0.15,(208,211,216),"0","login/logout",KEY,cap=50),
+    Button(0.60,0.79,0.15,0.15,(237,99,92),"Del","login/logout",DELETE,cap=50),
+    Button(0.8,0.05,0.15,0.15,(3,155,229),"Cancel","login/logout",PASS,cap=30)
     ]
-    
+
     # the following are just row/col ids for rows/cols.
     # e.g. if the column titled "Date In" is the third column, w.dateInCol will be 3.
     # w.nameCol must be the leftmost column in w.sheet
@@ -536,14 +541,14 @@ def start(w):
     w.idCol = None
     w.emailCol = None
     w.emailCol2 = None
-    
+
     checkConnection()
-    
+
     # checks to see if values currently on w.sheet2 are from today
     # if not, deletes them
     checkDates()
-    # runs checkDates every 2 hours
-    setInterval(checkDates,7200)
+    # runs checkDates every .002 hours
+    setInterval(checkDates,72)
     # runs checkLogs every 5 seconds
     setInterval(checkLogs,5)
 
@@ -560,26 +565,26 @@ def button(x,y,w,h,color,text,rounded,cap):
         fillRectangle(x*width,y*height+30,w*width,h*height-60,color=color)
         # top-left
         fillCircle(30+x*width,30+y*height,30,color=color)
-        drawArcCircle(30+x*width,30+y*height,30,90,180)
+#        drawArcCircle(30+x*width,30+y*height,30,90,180)
         # top-right
         fillCircle((x+w)*width-30,30+y*height,30,color=color)
-        drawArcCircle((x+w)*width-30,30+y*height,30,0,90)
+#        drawArcCircle((x+w)*width-30,30+y*height,30,0,90)
         # bottom-left
         fillCircle(30+x*width,30+(y+h)*height-60,30,color=color)
-        drawArcCircle(30+x*width,30+(y+h)*height-60,30,180,270)
+#        drawArcCircle(30+x*width,30+(y+h)*height-60,30,180,270)
         # bottom-right
         fillCircle((x+w)*width-30,30+(y+h)*height-60,30,color=color)
-        drawArcCircle((x+w)*width-30,30+(y+h)*height-60,30,270,360)
+#        drawArcCircle((x+w)*width-30,30+(y+h)*height-60,30,270,360)
         # vertical-lines
-        drawLine(x*width,y*height+30,x*width,(y+h)*height-30)
-        drawLine((x+w)*width,y*height+30,(x+w)*width,(y+h)*height-30)
+#        drawLine(x*width,y*height+30,x*width,(y+h)*height-30)
+#        drawLine((x+w)*width,y*height+30,(x+w)*width,(y+h)*height-30)
         # horizontal-lines
-        drawLine(x*width+30,y*height,(x+w)*width-30,y*height)
-        drawLine(x*width+30,(y+h)*height,(x+w)*width-30,(y+h)*height)
+#        drawLine(x*width+30,y*height,(x+w)*width-30,y*height)
+#        drawLine(x*width+30,(y+h)*height,(x+w)*width-30,(y+h)*height)
     else:
         # draws a rectangular button
         fillRectangle(x*width,y*height,w*width,h*height,color=color)
-        drawRectangle(x*width,y*height,w*width,h*height)
+#        drawRectangle(x*width,y*height,w*width,h*height)
     if not text=="":
         # size represents the size that each character of the string is
         size = 1
@@ -602,7 +607,10 @@ def draw(w):
     # draws each button
     for b in w.buttons:
         if b.where==w.page:
-            button(b.x,b.y,b.w,b.h,b.color,b.text,b.rounded,b.cap)
+            text = b.text
+            if b.text=="OK": # for the clarity of the login/logout screens
+                text=w.io.capitalize()
+            button(b.x,b.y,b.w,b.h,b.color,text,b.rounded,b.cap)
     # for the display on the login/logout page
     if w.page=="login/logout":
         s = sizeString(w.id,90,font="Arial")
