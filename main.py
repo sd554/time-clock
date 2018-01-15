@@ -7,6 +7,7 @@ from graphics import *
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread, os, json, time, threading, smtplib, httplib2, urllib2
 
+
 # graphics is a graphics library
 # oauth2client, gspread, and httplib2 are for uploading to the spreadsheet
 # os is used for os.system, which runs shell script
@@ -80,7 +81,8 @@ class Log:
 # text to speech
 def say(string):
     if os.name=="posix": # macintosh
-        os.system("say '"+string+"' -vSamantha")
+        pass
+        # os.system("say '"+string+"' -vSamantha")
     elif os.name=="nt": # windows
         # creates a file to read from, reads from it, then deletes the file
         open("tts.txt","w").write(string)
@@ -158,7 +160,7 @@ def checkLogs():
     w=getWorld()
     checkConnection() # checks wifi
     if not w.running and w.connection:
-        w.running=True
+        w.running = True
         # keys: number in each file name
         # values: a list with all of the data from the file
         logData = {}
@@ -186,8 +188,8 @@ def checkLogs():
                     logout(log)
                 # uploads data to the History Spreadsheet
                 history(log)
+            # if wifi is lost again, re-creates the files
             else:
-                print "HI"
                 val = 0
                 for l in logs:
                     createFile(logData[l])
@@ -203,21 +205,20 @@ def checkDates():
     checkConnection() # checks wifi
     if w.connection:
         try:
-            # if the first row on the spreadsheet contains a different date than todays date
-            if not w.sheet2.cell(2,w.dateInCol).value==time.strftime("%x"):
-                # the following code deletes all rows on spreadsheet and emails members
+            # checks to make sure at least one person is clocked in
+            if not w.sheet2.cell(2,w.dateInCol).value=="":
+                # if people are clocked in from the day before, the following code deletes all rows on spreadsheet and emails members
                 while not w.sheet2.cell(2,w.dateInCol).value==time.strftime("%x"):
                     # first three lines are for logging in to 1540photo@gmail.com
                     server = smtplib.SMTP("smtp.gmail.com",587)
                     server.starttls()
                     server.login("1540photo@gmail.com","robotics1540")
                     # sends an email to the user
-                    msg = "You forgot to sign out of the lab on "+w.sheet2.cell(2,w.dateInCol).value+". You cannot log these hours online. Next time, remember to log out."
+                    msg = "You forgot to sign out of the lab on "+w.sheet2.cell(2,w.dateInCol).value+". You cannot log these hours online."
                     server.sendmail("1540photo@gmail.com",w.sheet2.cell(2,w.emailCol2).value,msg)
                     server.quit()
                     # deletes the row
                     w.sheet2.delete_row(2)
-                    return True
         except:
             checkConnection()
 
@@ -301,8 +302,8 @@ def logout(log):
                 old = w.sheet2.cell(nameRow,w.timeInCol).value
                 p1 = old.split(":") # the previous logged time in a list with format [hours, minutes, seconds]
                 p2 = log.time.split(":") # the new logged time in a list with format [hours, minutes, seconds]
-                val1 = float(p1[0]) + float(p1[1])/60.0 + float(p1[2])/360.0 # converts p1 into just hours
-                val2 = float(p2[0]) + float(p2[1])/60.0 + float(p2[2])/360.0 # converts p2 into just hours
+                val1 = float(p1[0]) + float(p1[1])/60.0 + float(p1[2])/3600.0 # converts p1 into just hours
+                val2 = float(p2[0]) + float(p2[1])/60.0 + float(p2[2])/3600.0 # converts p2 into just hours
                 total = val2 - val1 # finds the net time
                 current = 0.0 # current is the time on the hours and certs spreadsheet
                 if not w.sheet.cell(log.idRow,w.labHoursCol).value=="":
@@ -327,7 +328,8 @@ def checkConnection():
         urllib2.urlopen('https://www.google.com', timeout=1)
         if w.connection==False:
             w.connection=True
-            connect()
+            if not connect():
+                return False
         return True
     except urllib2.URLError:
         w.connection=False
@@ -340,9 +342,9 @@ def connect():
         # sets up the client (only used in the next three lines)
         client = gspread.authorize(ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', ['https://spreadsheets.google.com/feeds']))
         # The Hours and Certifications Spreadsheet
-        w.sheet = client.open("Hoursheet").sheet1
+        w.sheet = client.open("HOURS TESTING").sheet1
         # The Current Lab Attendance Spreadsheet
-        w.sheet2 = client.open("Hoursheet").get_worksheet(1)
+        w.sheet2 = client.open("HOURS TESTING").get_worksheet(1)
         # The Lab History Spreadsheet
         w.sheet3 = client.open("History").sheet1
         # finds where the labeled columns start
@@ -387,8 +389,10 @@ def connect():
                 w.ids.append(i)
             elif seen==True:
                 break
+        return True
     except httplib2.ServerNotFoundError:
         w.connection = False
+        return False
 
 ################################################################
 ########################## Mouse Press #########################
@@ -452,6 +456,7 @@ def OK(b):
                 for val in w.sheet2.col_values(w.nameCol2):
                     # You Are Clocked In and Are Logging In
                     if val==name and w.io=="in":
+                        print "You are already clocked in!"
                         say("You are already clocked in!")
                         break
                     # You Are Clocked In and Are Logging Out
@@ -468,17 +473,19 @@ def OK(b):
                         break
                     # You Are Clocked Out and Are Logging Out
                     elif val=="" and w.io=="out":
+                        print "You never signed in!"
                         say("You never signed in!")
                         break
+            else:
+                # if the ID is invalid, as it doesn't exist
+                say(str(w.id)+"is not a valid ID!")
+                print w.id+" is not a valid ID."
         except:
             t = time.strftime("%H:%M:%S") # the time in hours:minutes:seconds
             d = time.strftime("%x") # the date
             createFile(["incomplete",w.io,w.id,t,d])
             reset()
-        else:
-            # if the ID is invalid, as it doesn't exist
-            say(str(w.id)+"is not a valid ID!")
-            print w.id+" is not a valid ID."
+
     else:
         t = time.strftime("%H:%M:%S") # the time in hours:minutes:seconds
         d = time.strftime("%x") # the date
