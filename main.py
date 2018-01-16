@@ -18,8 +18,8 @@ import gspread, os, json, time, threading, smtplib, httplib2, urllib2
 # smtplib is for sending emails
 
 # user can change the width and height variable to whatever fits the screen best
-width=800 #window width
-height=600 #window height
+width=1330 #window width
+height=800 #window height
 makeGraphicsWindow(width,height)
 setWindowTitle("Time Clock")
 
@@ -86,7 +86,7 @@ def say(string):
     elif os.name=="nt": # windows
         # creates a file to read from, reads from it, then deletes the file
         open("tts.txt","w").write(string)
-        os.system("cscript 'C:\Program Files\Jampal\ptts.vbs' < tts.txt -voice 'Microsoft Hazel Desktop'")
+        os.system('cscript "C:\Program Files\Jampal\ptts.vbs" < tts.txt -voice "Microsoft Hazel Desktop"')
         os.remove("tts.txt")
 
 # function that detects if point is inside of a box
@@ -110,9 +110,13 @@ def setInterval(function, seconds):
 
 # brings user back to home page
 def reset():
-    getWorld().page="home"
-    getWorld().id=""
-    getWorld().io=None
+    w=getWorld()
+    if not w.name=="":
+        w.msg = w.name + " clocked " + w.io
+    w.name=""
+    w.page="home"
+    w.id=""
+    w.io=None
 
 # writes a log file to the logs folder
 def createFile(l):
@@ -201,6 +205,9 @@ def checkLogs():
 # if someone is clocked in past midnight, the system deletes them from the spreadsheet, then emails them telling them they forgot to clock out.
 # this runs every two hours
 def checkDates():
+    for f in os.listdir("logs"):
+        if f[-5:]==".json":
+            return
     w=getWorld()
     checkConnection() # checks wifi
     if w.connection:
@@ -452,12 +459,14 @@ def OK(b):
                 idRow = w.ids.index(w.id)+w.labelRow+1 # row on hours/certs spreadsheet with the person
                 name = w.sheet.cell(idRow,w.nameCol).value
                 email = w.sheet.cell(idRow,w.emailCol).value
+                w.name=name
                 # os.system("say 'string' -vSamantha") speaks 'string' using Siri's voice
                 for val in w.sheet2.col_values(w.nameCol2):
                     # You Are Clocked In and Are Logging In
                     if val==name and w.io=="in":
                         print "You are already clocked in!"
                         say("You are already clocked in!")
+                        w.name = ""
                         break
                     # You Are Clocked In and Are Logging Out
                     elif val==name and w.io=="out":
@@ -475,6 +484,7 @@ def OK(b):
                     elif val=="" and w.io=="out":
                         print "You never signed in!"
                         say("You never signed in!")
+                        w.name = ""
                         break
             else:
                 # if the ID is invalid, as it doesn't exist
@@ -512,6 +522,8 @@ def start(w):
     w.logs = []
     # whether or not checkLogs() is running
     w.running = False
+    w.msg = ""
+    w.name = ""
 
     w.connection = False
     w.sheet = None # The Hours and Certifications Spreadsheet
@@ -622,6 +634,9 @@ def draw(w):
     if w.page=="login/logout":
         s = sizeString(w.id,90,font="Arial")
         drawString(w.id,width/2-s[0]/2.0,height*.01,size=90,font="Arial")
+    elif w.page=="home":
+        s = sizeString(w.msg,30,font="Arial")
+        drawString(w.msg,width/2-s[0]/2.0,height*.01,size=30,font="Arial")
     if w.connection==False:
         drawString("Please connect to Wifi.",10,10,size=20,font="Arial")
 
